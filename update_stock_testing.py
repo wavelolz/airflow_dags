@@ -17,9 +17,24 @@ default_arg = {
     "retry_delay" : timedelta(minutes=5)
 }
 
-
 def time_control():
     time.sleep(30)
+
+def get_token():
+    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    slack_token_path = os.path.join(dir_path, "token/slack_token.txt")
+    finmind_token_path = os.path.join(dir_path, "token/finmind_token.txt")
+
+    with open(slack_token_path) as f:
+        for line in f.readlines():
+            slack_token=line
+
+    with open(finmind_token_path) as f:
+        for line in f.readlines():
+            finmind_token=line
+
+    return slack_token, finmind_token
+
 
 def get_date():
     dag_file_path = os.path.dirname(os.path.realpath(__file__))
@@ -36,7 +51,7 @@ def get_date():
 
 def check_trading_or_not(**context):
     date = context["ti"].xcom_pull(task_ids="get_date")
-    print(date)
+    _, finmind_token = context["ti"].xcom_pull(task_ids="get_token")
     start_date = str(datetime.strptime(date, "%Y-%m-%d")-timedelta(days=5)).split(" ")[0]
     end_date = str(datetime.strptime(date, "%Y-%m-%d")+timedelta(days=2)).split(" ")[0]
     parameter = {
@@ -44,7 +59,7 @@ def check_trading_or_not(**context):
         "data_id": f"2330",
         "start_date": f"{start_date}",
         "end_date": f"{end_date}",
-        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRlIjoiMjAyNC0wMy0yMyAxMzo1OTo1MyIsInVzZXJfaWQiOiJ3YXZlbG9sejYiLCJpcCI6IjExMS4yNDIuMTg4LjE5NCJ9.Yt851qpXU_wTmhiYIbQec6nm4Vf8wdhY4mFqUWA6Llg"
+        "token": f"{finmind_token}"
     }
     url = "https://api.finmindtrade.com/api/v4/data"
     resp = requests.get(url, params=parameter)
@@ -58,14 +73,16 @@ def check_trading_or_not(**context):
     
 def generate_message_trade(**context):
     date = context["ti"].xcom_pull(task_ids="get_date")
-    webhook_url = "https://hooks.slack.com/services/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"
+    slack_token, _ = context["ti"].xcom_pull(task_ids="get_token")
+    webhook_url = f"{slack_token}"
     message = {"text": f"{date} 有交易喔"}
     headers = {"Content-Type": "application/json"}
     response = requests.post(webhook_url, json=message, headers=headers)
 
 def generate_message_no_trade(**context):
     date = context["ti"].xcom_pull(task_ids="get_date")
-    webhook_url = "https://hooks.slack.com/services/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"
+    slack_token, _ = context["ti"].xcom_pull(task_ids="get_token")
+    webhook_url = f"{slack_token}"
     message = {"text": f"{date} 沒有交易喔"}
     headers = {"Content-Type": "application/json"}
     response = requests.post(webhook_url, json=message, headers=headers)
@@ -75,6 +92,11 @@ with DAG("update_stock_testing", default_args=default_arg) as dag:
     time_control_task = PythonOperator(
         task_id="time_control",
         python_callable=time_control
+    )
+
+    get_token_task = PythonOperator(
+        task_id="get_token",
+        python_callable=get_token
     )
 
     get_date_task = PythonOperator(
@@ -99,7 +121,7 @@ with DAG("update_stock_testing", default_args=default_arg) as dag:
         provide_context=True
     )
 
-    time_control_task >> get_date_task >> check_trading_or_not_task
+    time_control_task >> get_token_task >> get_date_task >> check_trading_or_not_task
 
     check_trading_or_not_task >> generate_message_trade_task
     check_trading_or_not_task >> generate_message_no_trade_task
