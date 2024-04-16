@@ -10,6 +10,7 @@ import os
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import numpy as np
+import extract_func
 
 default_arg = {
     "owner" : "Hung Jui Hsu",
@@ -18,64 +19,6 @@ default_arg = {
     "retries" : 2,
     "retry_delay" : timedelta(minutes=5)
 }
-
-
-def create_stock_id_list():
-    stock_id = pd.read_csv("stock_id.csv")["stock_id"][:60].to_list()
-    n = len(stock_id)
-    size = n // 6 + (1 if n % 6 > 0 else 0)
-    stock_id_sublist = [stock_id[i:i+size] for i in range(0, n, size)]
-    return stock_id_sublist
-
-
-def read_token():
-    with open("../secret_info/finmind_token.txt") as f:
-        token = []
-        for line in f.readlines():
-            token.append(line)
-    return token
-
-def fetch_data(token, stock_id, date):
-    print(f"Currently Fetching: {stock_id}")
-    start_date = str(datetime.strptime(date, "%Y-%m-%d")-timedelta(days=5)).split(" ")[0]
-    end_date = str(datetime.strptime(date, "%Y-%m-%d")+timedelta(days=2)).split(" ")[0]
-    parameter = {
-        "dataset": "TaiwanStockPrice",
-        "data_id": f"{stock_id}",
-        "start_date": f"{start_date}",
-        "end_date": f"{end_date}",
-        "token": f"{token}"
-    }
-    url = "https://api.finmindtrade.com/api/v4/data"
-    resp = requests.get(url, params=parameter)
-    data = resp.json()
-    try:
-        data = pd.DataFrame(data["data"])
-    except:
-        print(data)
-        print(token)
-    return data
-
-def manage_token(token, stock_list, date):
-    result = []
-    for stock_id in stock_list:
-        result.append(fetch_data(token, stock_id, date))
-    return result
-
-def fetch_all_data(date):
-    stock_list = create_stock_id_list()
-    token = read_token()
-    token = [i.strip() for i in token]
-    token = [i for i in token if len(i)>0]
-    result = []
-    start = time.time()
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(manage_token, token[i], stock_list[i], date) for i in range(len(token))]
-        for future in as_completed(futures):
-            result.extend(future.result())
-    end = time.time()
-    print(f"Time Spent: {np.round(end-start)}")
-    return result
 
 
 def time_control():
@@ -141,6 +84,22 @@ def generate_message_no_trade(**context):
     headers = {"Content-Type": "application/json"}
     response = requests.post(webhook_url, json=message, headers=headers)
 
+def extract_data(**context):
+    date = context["ti"].xcom_pull(task_ids="get_date")
+    stock_list = extract_func.create_stock_id_list()
+    token = extract_func.read_token()
+    token = [i.strip() for i in token]
+    token = [i for i in token if len(i)>0]
+    result = []
+    start = time.time()
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(extract_func.manage_token, token[i], stock_list[i], date) for i in range(len(token))]
+        for future in as_completed(futures):
+            result.extend(future.result())
+    end = time.time()
+    print(f"Time Spent: {np.round(end-start)}")
+    print(result[0])
+    return result
 
 with DAG("update_stock_info", default_args=default_arg) as dag:
     time_control_task = PythonOperator(
