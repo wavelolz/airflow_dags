@@ -11,6 +11,7 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 import numpy as np
 import extract_func
+import db_func
 
 default_arg = {
     "owner" : "Hung Jui Hsu",
@@ -85,7 +86,8 @@ def generate_message_no_trade(**context):
     response = requests.post(webhook_url, json=message, headers=headers)
 
 def extract_data(**context):
-    date = context["ti"].xcom_pull(task_ids="get_date")
+    # date = context["ti"].xcom_pull(task_ids="get_date")
+    date = "2022-06-01"
     stock_list = extract_func.create_stock_id_list()
     token = extract_func.read_token()
     token = [i.strip() for i in token]
@@ -98,8 +100,12 @@ def extract_data(**context):
             result.extend(future.result())
     end = time.time()
     print(f"Time Spent: {np.round(end-start)}")
-    print(result[0])
-    return result
+
+    db_func.load_row_to_db(result, "ext")
+
+def load_data():
+    data = db_func.read_data()
+    db_func.load_row_to_db(data, "load")
 
 with DAG("update_stock_info", default_args=default_arg) as dag:
     time_control_task = PythonOperator(
@@ -122,7 +128,16 @@ with DAG("update_stock_info", default_args=default_arg) as dag:
         python_callable=check_trading_or_not
     )
 
-    
+    extract_data_task = PythonOperator(
+        task_id="extract_data",
+        python_callable=extract_data
+    )
+
+    load_data_task = PythonOperator(
+        task_id="load_data",
+        python_callable=load_data
+    )
+
 
     generate_message_no_trade_task = PythonOperator(
         task_id="generate_message_no_trade",
@@ -132,5 +147,7 @@ with DAG("update_stock_info", default_args=default_arg) as dag:
 
     time_control_task >> get_token_task >> get_date_task >> check_trading_or_not_task
 
-    check_trading_or_not_task >> generate_message_trade_task
+    check_trading_or_not_task >> extract_data_task
     check_trading_or_not_task >> generate_message_no_trade_task
+
+    extract_data_task >> load_data_task
