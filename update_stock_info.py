@@ -15,7 +15,7 @@ import db_func
 
 default_arg = {
     "owner" : "Hung Jui Hsu",
-    "start_date" : datetime(year=2022, month=3, day=29, hour=13, minute=23, second=15),
+    "start_date" : datetime(year=2022, month=5, day=7, hour=13, minute=23, second=15),
     "schedule_interval" : "@daily",
     "retries" : 2,
     "retry_delay" : timedelta(minutes=5)
@@ -72,7 +72,7 @@ def check_trading_or_not(**context):
     data = pd.DataFrame(data["data"])
     filter_df = data.loc[data["date"].isin([date])]
     if len(filter_df)>0:
-        return "generate_message_trade"
+        return "extract_data"
     else:
         return "generate_message_no_trade"
     
@@ -86,8 +86,7 @@ def generate_message_no_trade(**context):
     response = requests.post(webhook_url, json=message, headers=headers)
 
 def extract_data(**context):
-    # date = context["ti"].xcom_pull(task_ids="get_date")
-    date = "2022-06-01"
+    date = context["ti"].xcom_pull(task_ids="get_date")
     stock_list = extract_func.create_stock_id_list()
     token = extract_func.read_token()
     token = [i.strip() for i in token]
