@@ -8,18 +8,32 @@ from datetime import datetime, timedelta
 import mysql.connector
 import json
 import os
+import subprocess
+import re
+import socket
+
+def get_ip():
+    # s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # try:
+    #     # doesn't even have to be reachable
+    #     s.connect(('10.255.255.255', 1))
+    #     IP = s.getsockname()[0]
+    # except:
+    #     IP = '127.0.0.1'
+    # finally:
+    #     s.close()
+    return "172.20.10.2"
 
 def read_db_info(mode):
-    info = []
-    dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    mysql_info_path = os.path.join(dir_path, "secret_info/mysql_connect_info.txt")
-    with open(mysql_info_path) as f:
-        for line in f.readlines():
-            info.append(line)
     if mode == "ext":
-        return info[0]
+        config = load_config("raw")
     elif mode == "load":
-        return info[1]
+        config = load_config("test")
+    host = get_ip()
+    config["host"] = host
+    engine_path = f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}/{config['database']}"
+    engine_path = engine_path.replace("@", '%40', 1)
+    return engine_path
 
 def clear_invalid_data(stock_df_list):
     result = []
@@ -49,7 +63,7 @@ def load_row_to_db(stock_df_list, mode):
 
 def load_config(db_name):
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    config_path = os.path.join(dir_path, "secret_info/config.json")
+    config_path = os.path.join(dir_path, "secret_info/mysql_connect_config.json")
     with open(config_path, 'r') as file:
         config = json.load(file)
 
@@ -58,29 +72,30 @@ def load_config(db_name):
     elif db_name == "test":
         return config[1]
 
-def read_data():
-    config = load_config("raw")
+# def read_data():
+#     config = load_config("raw")
 
-    cnx = mysql.connector.connect(**config)
-    cursor = cnx.cursor()
+#     cnx = mysql.connector.connect(**config)
+#     cursor = cnx.cursor()
 
-    query = """ 
-            select TABLE_NAME as table_name
-            from information_schema.tables
-            where table_schema = 'test';
-            """
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    table_name = pd.DataFrame(rows, columns=[i[0] for i in cursor.description])["table_name"].to_list()
+#     query = """ 
+#             select TABLE_NAME as table_name
+#             from information_schema.tables
+#             where table_schema = 'test';
+#             """
+#     cursor.execute(query)
+#     rows = cursor.fetchall()
+#     table_name = pd.DataFrame(rows, columns=[i[0] for i in cursor.description])["table_name"].to_list()
 
-    result = []
-    for i in table_name:
-        query = f"select * from {i}"
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        data = pd.DataFrame(rows, columns=[i[0] for i in cursor.description])
-        result.append(data)
+#     result = []
+#     for i in table_name:
+#         query = f"select * from {i}"
+#         cursor.execute(query)
+#         rows = cursor.fetchall()
+#         data = pd.DataFrame(rows, columns=[i[0] for i in cursor.description])
+#         result.append(data)
 
-    cursor.close()
-    cnx.close()
-    return result
+#     cursor.close()
+#     cnx.close()
+#     return result
+

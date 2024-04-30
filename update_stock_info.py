@@ -23,7 +23,7 @@ default_arg = {
 
 
 def time_control():
-    time.sleep(30)
+    time.sleep(10)
 
 def get_token():
     dir_path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -86,7 +86,8 @@ def generate_message_no_trade(**context):
     response = requests.post(webhook_url, json=message, headers=headers)
 
 def extract_data(**context):
-    date = context["ti"].xcom_pull(task_ids="get_date")
+    # date = context["ti"].xcom_pull(task_ids="get_date")
+    date = "2022-04-17"
     stock_list = extract_func.create_stock_id_list()
     token = extract_func.read_token()
     token = [i.strip() for i in token]

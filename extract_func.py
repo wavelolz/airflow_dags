@@ -28,7 +28,7 @@ def read_db_info():
 def create_stock_id_list():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     stock_id_path = os.path.join(dir_path, "stock_id.csv")
-    stock_id = pd.read_csv(stock_id_path)["stock_id"][:60].to_list()
+    stock_id = pd.read_csv(stock_id_path)["stock_id"][:6].to_list()
     n = len(stock_id)
     size = n // 6 + (1 if n % 6 > 0 else 0)
     stock_id_sublist = [stock_id[i:i+size] for i in range(0, n, size)]
