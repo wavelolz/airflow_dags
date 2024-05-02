@@ -22,7 +22,7 @@ def get_ip():
     #     IP = '127.0.0.1'
     # finally:
     #     s.close()
-    return "172.20.10.2"
+    return "192.168.1.137"
 
 def read_db_info(mode):
     if mode == "ext":

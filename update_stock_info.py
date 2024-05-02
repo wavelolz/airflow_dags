@@ -15,8 +15,7 @@ import db_func
 
 default_arg = {
     "owner" : "Hung Jui Hsu",
-    "start_date" : datetime(year=2022, month=5, day=7, hour=13, minute=23, second=15),
-    "schedule_interval" : "@daily",
+    "start_date" : datetime(year=2024, month=5, day=2, hour=8, minute=5, second=0),
     "retries" : 2,
     "retry_delay" : timedelta(minutes=5)
 }
@@ -86,8 +85,7 @@ def generate_message_no_trade(**context):
     response = requests.post(webhook_url, json=message, headers=headers)
 
 def extract_data(**context):
-    # date = context["ti"].xcom_pull(task_ids="get_date")
-    date = "2022-04-17"
+    date = context["ti"].xcom_pull(task_ids="get_date")
     stock_list = extract_func.create_stock_id_list()
     token = extract_func.read_token()
     token = [i.strip() for i in token]
@@ -107,7 +105,7 @@ def load_data():
     data = db_func.read_data()
     db_func.load_row_to_db(data, "load")
 
-with DAG("update_stock_info", default_args=default_arg) as dag:
+with DAG("update_stock_info", default_args=default_arg, schedule_interval="*/10 * * * *") as dag:
     time_control_task = PythonOperator(
         task_id="time_control",
         python_callable=time_control
